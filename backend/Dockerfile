@@ -1,23 +1,27 @@
-# Use Node.js base image
-FROM node:18-alpine
+# --- Stage 1: Build ---
+FROM node:18-alpine AS builder
 
-# Install Python and pip
-RUN apk add --no-cache python3 py3-pip
-
-# Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json
+# Install dependencies only
 COPY package*.json ./
+RUN npm ci --only=production
 
-# Install Node.js dependencies
-RUN npm install
-
-# Copy the rest of the application code
+# Copy app source code
 COPY . .
 
-# Expose the port the app runs on
+# --- Stage 2: Run ---
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy only the necessary built artifacts and node_modules
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app ./
+
+# Remove unnecessary files (tests, docs, cache, etc.)
+RUN rm -rf /app/tests /app/docs /root/.npm /tmp/*
+
 EXPOSE 5000
 
-# Command to run the application
 CMD ["npm", "start"]
